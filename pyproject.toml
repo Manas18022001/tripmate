@@ -12,7 +12,6 @@ langchain = "^0.3"
 langchain-google-genai = "^2.0"
 langchain-community = "^0.3"
 langgraph = "^0.4"
-chromadb = "^0.5"
 fastapi = "^0.115"
 uvicorn = {extras = ["standard"], version = "^0.30"}
 streamlit = "^1.40"

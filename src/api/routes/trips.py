@@ -21,6 +21,7 @@ async def plan_trip(request: TripRequest, db: Session = Depends(get_db)):
         model=settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=settings.llm_temperature,
+        max_retries=1,
     )
     
     # We define the expected JSON schema clearly in the prompt to help the LLM.
