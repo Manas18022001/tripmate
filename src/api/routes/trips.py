@@ -1,65 +1,48 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
-
 from src.api.schemas.trip import TripRequest, TripResponse, DayPlan
 from src.db.engine import get_db
 from src.db.models import Trip
 from src.config import settings
+from src.agents.graph import build_trip_graph
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
+
+# Compile graph once
+graph = build_trip_graph()
 
 @router.post("/plan", response_model=TripResponse)
 async def plan_trip(request: TripRequest, db: Session = Depends(get_db)):
     if not settings.google_api_key or settings.google_api_key == "your-google-api-key-here":
         raise HTTPException(status_code=500, detail="Google API Key is not configured")
 
-    llm = ChatGoogleGenerativeAI(
-        model=settings.llm_model,
-        google_api_key=settings.google_api_key,
-        temperature=settings.llm_temperature,
-        max_retries=1,
-    )
-    
-    # We define the expected JSON schema clearly in the prompt to help the LLM.
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are TripMate, an expert Indian travel planner. 
-You must respond ONLY with a valid JSON object matching the following structure:
-{{
-  "destination": "string",
-  "num_days": 1,
-  "itinerary": [
-    {{
-      "day": 1,
-      "title": "string",
-      "activities": ["string", "string"],
-      "meals": ["string", "string"],
-      "estimated_cost": 1000.0,
-      "travel_tips": "string"
-    }}
-  ],
-  "total_estimated_cost": 1000.0,
-  "budget_status": "string",
-  "tips": ["string", "string"]
-}}
-"""),
-        ("human", """Plan a trip with these details:
-Destination: {destination}
-Days: {num_days}
-Budget: ₹{budget}
-Interests: {interests}
-Travelers: {num_travelers}
-Month: {travel_month}
-"""),
-    ])
-    
-    chain = prompt | llm | JsonOutputParser()
+    initial_state = {
+        "messages": [],
+        "destination": request.destination,
+        "num_days": request.num_days,
+        "budget": request.budget,
+        "interests": request.interests,
+        "num_travelers": request.num_travelers,
+        "travel_month": request.travel_month,
+        "iteration_count": 0,
+        "itinerary": [],
+        "budget_breakdown": None,
+    }
     
     try:
-        result = await chain.ainvoke(request.model_dump())
+        # Run the multi-agent graph
+        final_state = await graph.ainvoke(initial_state)
+        
+        # Prepare the response format
+        result = {
+            "destination": request.destination,
+            "num_days": request.num_days,
+            "itinerary": final_state.get("itinerary", []),
+            "total_estimated_cost": final_state.get("total_estimated_cost", 0),
+            "budget_status": final_state.get("budget_status", "unknown"),
+            "tips": final_state.get("tips", [])
+        }
         
         # Save to database
         db_trip = Trip(
@@ -82,7 +65,6 @@ Month: {travel_month}
 @router.get("/", response_model=list[TripResponse])
 def get_trips(db: Session = Depends(get_db)):
     trips = db.query(Trip).all()
-    # For now, we will return empty list or just map itinerary_json
     response_trips = []
     for t in trips:
         if t.itinerary_json:

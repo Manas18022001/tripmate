@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # LLM
     google_api_key: str = ""
-    llm_model: str = "gemini-3.8-pro"
+    llm_model: str = "gemini-3.7-flash"
     llm_temperature: float = 0.7
     
     # Database
