@@ -12,6 +12,7 @@ def itinerary_node(state: TripState) -> dict:
         model=settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=0.7,
+        max_retries=1,
     )
     
     # If the budget agent flagged this as over budget, we add a constraint to the prompt
@@ -21,9 +22,11 @@ def itinerary_node(state: TripState) -> dict:
 
     system_prompt = f"""You are the Itinerary Agent for TripMate.
 Based on the research provided, create a personalized {state['num_days']}-day itinerary for {state['destination']}.
-The user's budget is ₹{state['budget']}.
+The user's total budget is ₹{state['budget']} for a group of {state['num_travelers']} traveler(s).
 Their interests are: {', '.join(state['interests'])}.
 {budget_constraint}
+
+IMPORTANT: The `estimated_cost` for each day MUST be the TOTAL cost for ALL {state['num_travelers']} traveler(s) combined. Do not output the per-person cost.
 
 You must return ONLY a JSON object with this exact structure:
 {{
@@ -56,5 +59,7 @@ You must return ONLY a JSON object with this exact structure:
         "itinerary": response.get("itinerary", []),
         "tips": response.get("tips", []),
         "total_estimated_cost": total_cost,
-        "messages": [HumanMessage(content="Itinerary generated.", name="itinerary_agent")]
+        "messages": [HumanMessage(content="Itinerary generated.", name="itinerary_agent")],
+        "budget_breakdown": None,
+        "budget_status": ""
     }

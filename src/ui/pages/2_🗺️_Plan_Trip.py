@@ -32,7 +32,7 @@ with st.form("trip_form"):
 async def generate_trip(payload):
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post("http://localhost:8000/api/trips/plan", json=payload, timeout=60.0)
+            response = await client.post("http://127.0.0.1:8000/api/trips/plan", json=payload, timeout=120.0)
             if response.status_code == 200:
                 return response.json()
             else:

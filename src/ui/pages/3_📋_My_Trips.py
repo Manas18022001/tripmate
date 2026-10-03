@@ -9,7 +9,7 @@ st.title("📋 My Saved Trips")
 async def fetch_trips():
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get("http://localhost:8000/api/trips/")
+            response = await client.get("http://127.0.0.1:8000/api/trips/")
             if response.status_code == 200:
                 return response.json()
             else:

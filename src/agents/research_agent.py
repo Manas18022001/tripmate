@@ -12,7 +12,8 @@ def research_node(state: TripState) -> dict:
         model=settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=0.3, # Low temperature for factual research
-    ).bind_tools([search_destination_knowledge, get_weather_info])
+        max_retries=1,
+    )
     
     system_prompt = """You are the Research Agent for TripMate.
 Your job is to gather accurate, up-to-date information about the user's destination.
@@ -45,7 +46,7 @@ Here is the raw data retrieved from our database:
 User Request: {human_msg}
 Please summarize the findings."""
     
-    response = llm.invoke([SystemMessage(content=summary_prompt)])
+    response = llm.invoke([HumanMessage(content=summary_prompt)])
     
     return {
         "destination_info": response.content,
