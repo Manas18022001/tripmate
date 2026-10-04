@@ -1,4 +1,6 @@
 from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
 
 class TripRequest(BaseModel):
     destination: str = Field(..., example="Manali")
@@ -14,12 +16,30 @@ class DayPlan(BaseModel):
     activities: list[str]
     meals: list[str]
     estimated_cost: float
-    travel_tips: str
+    travel_tips: str = ""
+
+class BudgetBreakdown(BaseModel):
+    total_cost: float = 0
+    budget: float = 0
+    difference: float = 0  # positive = under budget
 
 class TripResponse(BaseModel):
+    id: Optional[int] = None
     destination: str
     num_days: int
     itinerary: list[DayPlan]
     total_estimated_cost: float
     budget_status: str
+    budget_breakdown: Optional[BudgetBreakdown] = None
     tips: list[str]
+    thread_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+# --- Chat schemas ---
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., example="Can you make day 2 more adventurous?")
+
+class ChatResponse(BaseModel):
+    reply: str
+    updated_trip: Optional[TripResponse] = None

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Text
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime
+from sqlalchemy.sql import func
 from src.db.engine import Base
 
 class Trip(Base):
@@ -12,3 +13,5 @@ class Trip(Base):
     num_travelers = Column(Integer)
     travel_month = Column(String)
     itinerary_json = Column(Text, nullable=True)  # Store JSON response string
+    thread_id = Column(String, nullable=True, unique=True)  # For LangGraph checkpointing
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

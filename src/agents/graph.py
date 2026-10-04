@@ -5,7 +5,7 @@ from src.agents.research_agent import research_node
 from src.agents.itinerary_agent import itinerary_node
 from src.agents.budget_agent import budget_node
 
-def build_trip_graph():
+def build_trip_graph(checkpointer=None):
     """Build and compile the multi-agent LangGraph."""
     graph = StateGraph(TripState)
     
@@ -35,4 +35,4 @@ def build_trip_graph():
     graph.add_edge("itinerary_agent", "supervisor")
     graph.add_edge("budget_agent", "supervisor")
     
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
