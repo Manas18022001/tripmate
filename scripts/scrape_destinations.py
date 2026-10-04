@@ -34,9 +34,9 @@ async def scrape_url(client, name, url):
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(response.text)
             
-        print(f"✅ Successfully saved {name} to {filepath}")
+        print(f"Success: Saved {name} to {filepath}")
     except Exception as e:
-        print(f"❌ Failed to scrape {name}: {e}")
+        print(f"Error: Failed to scrape {name}: {e}")
 
 async def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)

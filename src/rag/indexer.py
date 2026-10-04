@@ -23,7 +23,7 @@ class KnowledgeBaseIndexer:
     def index_destinations(self, data_dir: str = "./data/destinations"):
         print(f"Loading documents from {data_dir}...")
         # Load all markdown files
-        loader = DirectoryLoader(data_dir, glob="**/*.md", loader_cls=TextLoader)
+        loader = DirectoryLoader(data_dir, glob="**/*.md", loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"})
         docs = loader.load()
         
         if not docs:
@@ -42,10 +42,24 @@ class KnowledgeBaseIndexer:
             
         print(f"Created {len(chunks)} chunks. Indexing into FAISS...")
         
-        # Create and save FAISS index
-        vectorstore = FAISS.from_documents(chunks, self.embeddings)
+        # Create and save FAISS index in batches to respect Gemini Free Tier limits
+        import time
+        vectorstore = None
+        batch_size = 80 # Under the 100 requests/min limit
         
-        # Ensure directory exists
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i+batch_size]
+            print(f"Indexing batch {i//batch_size + 1} of {(len(chunks)-1)//batch_size + 1}...")
+            
+            if i > 0:
+                print("Sleeping 65 seconds to clear Gemini API quota...")
+                time.sleep(65)
+                
+            if vectorstore is None:
+                vectorstore = FAISS.from_documents(batch, self.embeddings)
+            else:
+                vectorstore.add_documents(batch)
+        
         os.makedirs(settings.chroma_persist_dir, exist_ok=True) 
         # (We are reusing the path name from config even though it's FAISS now)
         
