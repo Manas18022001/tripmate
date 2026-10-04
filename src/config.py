@@ -1,9 +1,9 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    # LLM
+    # LLM (Switched to local Ollama)
     google_api_key: str = ""
-    llm_model: str = "gemini-3.1-flash-lite"
+    llm_model: str = "llama3.2"
     llm_temperature: float = 0.7
     
     # Database

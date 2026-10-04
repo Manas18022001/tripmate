@@ -22,6 +22,7 @@ python-dotenv = "^1.0"
 pydantic = "^2.9"
 pydantic-settings = "^2.5"
 faiss-cpu = "^1.15.1"
+sentence-transformers = "^6.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

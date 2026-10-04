@@ -21,8 +21,6 @@ graph = build_trip_graph(checkpointer=checkpointer)
 
 @router.post("/plan", response_model=TripResponse)
 async def plan_trip(request: TripRequest, db: Session = Depends(get_db)):
-    if not settings.google_api_key or settings.google_api_key == "your-google-api-key-here":
-        raise HTTPException(status_code=500, detail="Google API Key is not configured")
 
     # Generate a unique thread_id for this trip conversation
     thread_id = str(uuid.uuid4())
@@ -138,9 +136,6 @@ async def chat_refine_trip(trip_id: int, chat_req: ChatRequest, db: Session = De
     if not trip.thread_id:
         raise HTTPException(status_code=400, detail="This trip does not support chat refinement (no thread_id)")
 
-    if not settings.google_api_key:
-        raise HTTPException(status_code=500, detail="Google API Key is not configured")
-
     try:
         # Load the existing trip data for context
         existing_data = json.loads(trip.itinerary_json)
@@ -148,14 +143,13 @@ async def chat_refine_trip(trip_id: int, chat_req: ChatRequest, db: Session = De
 
         # Build refinement state — we re-invoke the graph with the user's message
         from langchain_core.messages import HumanMessage
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain_community.chat_models import ChatOllama
         from langchain_core.output_parsers import JsonOutputParser
 
-        llm = ChatGoogleGenerativeAI(
+        llm = ChatOllama(
             model=settings.llm_model,
-            google_api_key=settings.google_api_key,
             temperature=0.7,
-            max_retries=1,
+            format="json",
         )
 
         refinement_prompt = f"""You are TripMate, an AI trip planner. The user has an existing trip and wants to modify it.

@@ -1,6 +1,6 @@
 import json
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.chat_models import ChatOllama
 from langchain_core.output_parsers import JsonOutputParser
 from src.agents.state import TripState
 from src.config import settings
@@ -8,11 +8,11 @@ from src.config import settings
 def itinerary_node(state: TripState) -> dict:
     """Agent responsible for generating the day-by-day itinerary."""
     
-    llm = ChatGoogleGenerativeAI(
+    # We enforce format="json" so the local model doesn't output markdown wrappers
+    llm = ChatOllama(
         model=settings.llm_model,
-        google_api_key=settings.google_api_key,
         temperature=0.7,
-        max_retries=1,
+        format="json",
     )
     
     # If the budget agent flagged this as over budget, we add a constraint to the prompt

@@ -1,6 +1,6 @@
 from langchain_core.tools import tool
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from src.config import settings
 
 # Global variables to cache the vector store so we don't load it on every tool call
@@ -9,10 +9,7 @@ _vectorstore = None
 def get_vectorstore():
     global _vectorstore
     if _vectorstore is None:
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-2",
-            google_api_key=settings.google_api_key,
-        )
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         try:
             _vectorstore = FAISS.load_local(
                 settings.chroma_persist_dir, 

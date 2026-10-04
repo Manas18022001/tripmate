@@ -1,5 +1,5 @@
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.chat_models import ChatOllama
 from src.agents.state import TripState
 from src.agents.tools.search import search_destination_knowledge
 from src.agents.tools.weather import get_weather_info
@@ -8,11 +8,9 @@ from src.config import settings
 def research_node(state: TripState) -> dict:
     """Agent responsible for gathering factual information about the destination."""
     
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatOllama(
         model=settings.llm_model,
-        google_api_key=settings.google_api_key,
         temperature=0.3, # Low temperature for factual research
-        max_retries=1,
     )
     
     system_prompt = """You are the Research Agent for TripMate.

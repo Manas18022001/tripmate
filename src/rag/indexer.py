@@ -1,17 +1,14 @@
 import os
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from src.config import settings
 
 class KnowledgeBaseIndexer:
     def __init__(self):
-        # We use Google's embedding model
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-2",
-            google_api_key=settings.google_api_key,
-        )
+        # Using a fast, local embedding model to avoid API rate limits entirely
+        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         
         # Splitter to chunk markdown files effectively
         self.splitter = RecursiveCharacterTextSplitter(
