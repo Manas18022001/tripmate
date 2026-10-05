@@ -5,10 +5,14 @@ from sqlalchemy.orm import Session
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.api.schemas.trip import TripRequest, TripResponse, BudgetBreakdown, ChatRequest, ChatResponse
+from src.api.errors import TripNotFoundError, LLMConnectionError, LLMOutputError
 from src.db.engine import get_db
 from src.db.models import Trip
 from src.config import settings
 from src.agents.graph import build_trip_graph
+from src.logging_config import get_logger
+
+logger = get_logger("routes.trips")
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
 
@@ -21,6 +25,7 @@ graph = build_trip_graph(checkpointer=checkpointer)
 
 @router.post("/plan", response_model=TripResponse)
 async def plan_trip(request: TripRequest, db: Session = Depends(get_db)):
+    logger.info(f"Planning trip: {request.destination} | {request.num_days}d | budget={request.budget} | travelers={request.num_travelers}")
 
     # Generate a unique thread_id for this trip conversation
     thread_id = str(uuid.uuid4())
@@ -42,48 +47,54 @@ async def plan_trip(request: TripRequest, db: Session = Depends(get_db)):
         # Run the multi-agent graph with checkpointing
         config = {"configurable": {"thread_id": thread_id}}
         final_state = await graph.ainvoke(initial_state, config=config)
-
-        # Build budget breakdown
-        breakdown_data = final_state.get("budget_breakdown") or {}
-        breakdown = {
-            "total_cost": final_state.get("total_estimated_cost", 0),
-            "budget": request.budget,
-            "difference": request.budget - final_state.get("total_estimated_cost", 0),
-        }
-
-        # Prepare the response
-        result = {
-            "destination": request.destination,
-            "num_days": request.num_days,
-            "itinerary": final_state.get("itinerary", []),
-            "total_estimated_cost": final_state.get("total_estimated_cost", 0),
-            "budget_status": final_state.get("budget_status", "unknown"),
-            "budget_breakdown": breakdown,
-            "tips": final_state.get("tips", []),
-            "thread_id": thread_id,
-        }
-
-        # Save to database
-        db_trip = Trip(
-            destination=request.destination,
-            num_days=request.num_days,
-            budget=request.budget,
-            interests=",".join(request.interests),
-            num_travelers=request.num_travelers,
-            travel_month=request.travel_month,
-            itinerary_json=json.dumps(result),
-            thread_id=thread_id,
-        )
-        db.add(db_trip)
-        db.commit()
-        db.refresh(db_trip)
-
-        result["id"] = db_trip.id
-        result["created_at"] = str(db_trip.created_at) if db_trip.created_at else None
-
-        return TripResponse(**result)
+    except ConnectionError as e:
+        raise LLMConnectionError()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e).lower()
+        if "connection" in error_msg or "refused" in error_msg:
+            raise LLMConnectionError()
+        logger.exception(f"Agent graph failed for {request.destination}")
+        raise HTTPException(status_code=500, detail=f"Trip generation failed: {str(e)}")
+
+    # Build budget breakdown
+    breakdown = {
+        "total_cost": final_state.get("total_estimated_cost", 0),
+        "budget": request.budget,
+        "difference": request.budget - final_state.get("total_estimated_cost", 0),
+    }
+
+    # Prepare the response
+    result = {
+        "destination": request.destination,
+        "num_days": request.num_days,
+        "itinerary": final_state.get("itinerary", []),
+        "total_estimated_cost": final_state.get("total_estimated_cost", 0),
+        "budget_status": final_state.get("budget_status", "unknown"),
+        "budget_breakdown": breakdown,
+        "tips": final_state.get("tips", []),
+        "thread_id": thread_id,
+    }
+
+    # Save to database
+    db_trip = Trip(
+        destination=request.destination,
+        num_days=request.num_days,
+        budget=request.budget,
+        interests=",".join(request.interests),
+        num_travelers=request.num_travelers,
+        travel_month=request.travel_month,
+        itinerary_json=json.dumps(result),
+        thread_id=thread_id,
+    )
+    db.add(db_trip)
+    db.commit()
+    db.refresh(db_trip)
+
+    result["id"] = db_trip.id
+    result["created_at"] = str(db_trip.created_at) if db_trip.created_at else None
+
+    logger.info(f"Trip saved: id={db_trip.id} | {request.destination} | cost={result['total_estimated_cost']}")
+    return TripResponse(**result)
 
 
 @router.get("/", response_model=list[TripResponse])
@@ -106,7 +117,7 @@ def get_trips(db: Session = Depends(get_db)):
 def get_trip(trip_id: int, db: Session = Depends(get_db)):
     trip = db.query(Trip).filter(Trip.id == trip_id).first()
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise TripNotFoundError(trip_id)
     try:
         data = json.loads(trip.itinerary_json)
         data["id"] = trip.id
@@ -120,9 +131,10 @@ def get_trip(trip_id: int, db: Session = Depends(get_db)):
 def delete_trip(trip_id: int, db: Session = Depends(get_db)):
     trip = db.query(Trip).filter(Trip.id == trip_id).first()
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise TripNotFoundError(trip_id)
     db.delete(trip)
     db.commit()
+    logger.info(f"Trip deleted: id={trip_id}")
     return {"detail": "Trip deleted"}
 
 
@@ -131,17 +143,19 @@ async def chat_refine_trip(trip_id: int, chat_req: ChatRequest, db: Session = De
     """Refine an existing trip through conversational chat."""
     trip = db.query(Trip).filter(Trip.id == trip_id).first()
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise TripNotFoundError(trip_id)
 
     if not trip.thread_id:
         raise HTTPException(status_code=400, detail="This trip does not support chat refinement (no thread_id)")
+
+    logger.info(f"Chat refinement for trip {trip_id}: {chat_req.message[:80]}...")
 
     try:
         # Load the existing trip data for context
         existing_data = json.loads(trip.itinerary_json)
         existing_itinerary = json.dumps(existing_data.get("itinerary", []), indent=2)
 
-        # Build refinement state — we re-invoke the graph with the user's message
+        # Build refinement state
         from langchain_core.messages import HumanMessage
         from langchain_community.chat_models import ChatOllama
         from langchain_core.output_parsers import JsonOutputParser
@@ -209,8 +223,15 @@ If the user is just asking a question (not modifying the trip), return:
             updated_result["id"] = trip.id
             updated_result["created_at"] = str(trip.created_at) if trip.created_at else None
             updated_trip_response = TripResponse(**updated_result)
+            logger.info(f"Trip {trip_id} updated via chat. New cost: {new_total_cost}")
 
         return ChatResponse(reply=reply, updated_trip=updated_trip_response)
 
+    except ConnectionError:
+        raise LLMConnectionError()
     except Exception as e:
+        error_msg = str(e).lower()
+        if "connection" in error_msg or "refused" in error_msg:
+            raise LLMConnectionError()
+        logger.exception(f"Chat refinement failed for trip {trip_id}")
         raise HTTPException(status_code=500, detail=str(e))
