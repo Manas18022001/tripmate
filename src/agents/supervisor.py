@@ -1,5 +1,4 @@
 from src.agents.state import TripState
-from langchain_core.messages import HumanMessage
 
 def supervisor_node(state: TripState) -> dict:
     """Orchestrator that decides which agent to invoke next."""

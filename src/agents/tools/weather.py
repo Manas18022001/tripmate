@@ -1,6 +1,4 @@
-import httpx
 from langchain_core.tools import tool
-from src.config import settings
 
 @tool
 def get_weather_info(destination: str, month: str) -> str:

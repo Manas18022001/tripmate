@@ -1,4 +1,3 @@
-import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_community.chat_models import ChatOllama
 from langchain_core.output_parsers import JsonOutputParser

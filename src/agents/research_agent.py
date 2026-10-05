@@ -1,8 +1,7 @@
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_community.chat_models import ChatOllama
 from src.agents.state import TripState
 from src.agents.tools.search import search_destination_knowledge
-from src.agents.tools.weather import get_weather_info
 from src.config import settings
 
 def research_node(state: TripState) -> dict:

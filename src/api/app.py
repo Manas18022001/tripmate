@@ -1,6 +1,8 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_community.cache import SQLiteCache
+from langchain.globals import set_llm_cache
 
 from src.api.routes import trips
 from src.db.engine import engine, Base
@@ -20,9 +22,6 @@ else:
     logger.info("LangSmith tracing disabled (set LANGCHAIN_API_KEY to enable)")
 
 # Enable LLM response caching via SQLite
-from langchain_community.cache import SQLiteCache
-from langchain.globals import set_llm_cache
-
 cache_path = ".langchain_cache.db"
 set_llm_cache(SQLiteCache(database_path=cache_path))
 logger.info(f"LLM response cache enabled at {cache_path}")

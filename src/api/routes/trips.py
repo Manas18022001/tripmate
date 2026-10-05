@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.api.schemas.trip import TripRequest, TripResponse, BudgetBreakdown, ChatRequest, ChatResponse
-from src.api.errors import TripNotFoundError, LLMConnectionError, LLMOutputError
+from src.api.schemas.trip import TripRequest, TripResponse, ChatRequest, ChatResponse
+from src.api.errors import TripNotFoundError, LLMConnectionError
 from src.db.engine import get_db
 from src.db.models import Trip
 from src.config import settings
@@ -47,7 +47,7 @@ async def plan_trip(request: TripRequest, db: Session = Depends(get_db)):
         # Run the multi-agent graph with checkpointing
         config = {"configurable": {"thread_id": thread_id}}
         final_state = await graph.ainvoke(initial_state, config=config)
-    except ConnectionError as e:
+    except ConnectionError:
         raise LLMConnectionError()
     except Exception as e:
         error_msg = str(e).lower()

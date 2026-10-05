@@ -18,7 +18,7 @@ async def fetch_trips():
             else:
                 st.error("Failed to fetch trips")
                 return []
-        except Exception as e:
+        except Exception:
             st.error("Cannot connect to backend. Make sure the FastAPI server is running.")
             return []
 
@@ -77,7 +77,7 @@ else:
                     st.markdown(f"- {tip}")
 
             # Delete button
-            if st.button(f"🗑️ Delete Trip", key=f"del_{trip_id}"):
+            if st.button("🗑️ Delete Trip", key=f"del_{trip_id}"):
                 success = asyncio.run(delete_trip(trip_id))
                 if success:
                     st.success("Trip deleted!")
